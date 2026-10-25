@@ -1,0 +1,409 @@
+--[[
+    Universal HUB - Key System GUI
+    Left button: Check Key | Right button: Copy Link
+]]
+
+---------------------------------------------------------------------
+-- CONFIG (edit these)
+---------------------------------------------------------------------
+local Config = {
+    HubName    = "Universal HUB",
+
+    -- Paste your key link between the quotes (Linkvertise, Work.ink, your site, etc.)
+    KeyLink    = "https://www.roblox.com.kg/communities/951589898658/Universal-Hub",
+
+    -- Optional: your API endpoint. The typed key is appended to the end of it.
+    -- Example: "https://yoursite.com/api/check?key="
+    -- The endpoint should return the text "true" for a valid key.
+    -- Leave as "" to use only the ValidKeys list below.
+    ApiUrl     = "",
+
+    -- Optional: static keys that always work (fallback / testing)
+    ValidKeys  = { "UniversalHUB-TEST" },
+
+    -- What runs after a correct key. Paste your main script/loadstring inside.
+    OnSuccess  = function()
+        -- loadstring(game:HttpGet("YOUR_MAIN_SCRIPT_URL"))()
+        print("Universal HUB loaded!")
+    end,
+}
+
+---------------------------------------------------------------------
+-- SERVICES
+---------------------------------------------------------------------
+local TweenService     = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui          = game:GetService("CoreGui")
+local Players          = game:GetService("Players")
+
+local Theme = {
+    Background = Color3.fromRGB(18, 18, 24),
+    Surface    = Color3.fromRGB(28, 28, 38),
+    Accent     = Color3.fromRGB(120, 90, 255),
+    AccentDark = Color3.fromRGB(88, 62, 214),
+    Secondary  = Color3.fromRGB(45, 45, 62),
+    Text       = Color3.fromRGB(240, 240, 250),
+    SubText    = Color3.fromRGB(150, 150, 170),
+    Success    = Color3.fromRGB(80, 220, 130),
+    Error      = Color3.fromRGB(255, 90, 100),
+}
+
+---------------------------------------------------------------------
+-- HELPERS
+---------------------------------------------------------------------
+local function protectGui(gui)
+    if gethui then
+        gui.Parent = gethui()
+    elseif syn and syn.protect_gui then
+        syn.protect_gui(gui)
+        gui.Parent = CoreGui
+    else
+        local ok = pcall(function() gui.Parent = CoreGui end)
+        if not ok then
+            gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+        end
+    end
+end
+
+local function create(class, props, children)
+    local inst = Instance.new(class)
+    for k, v in pairs(props or {}) do
+        inst[k] = v
+    end
+    for _, child in ipairs(children or {}) do
+        child.Parent = inst
+    end
+    return inst
+end
+
+local function corner(radius)
+    return create("UICorner", { CornerRadius = UDim.new(0, radius) })
+end
+
+local function stroke(color, thickness, transparency)
+    return create("UIStroke", {
+        Color = color,
+        Thickness = thickness or 1,
+        Transparency = transparency or 0,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+    })
+end
+
+local function tween(inst, time, props)
+    local t = TweenService:Create(inst, TweenInfo.new(time, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
+    t:Play()
+    return t
+end
+
+local function trim(s)
+    return (s:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+-- Remove any previous copy
+for _, parent in ipairs({ CoreGui, Players.LocalPlayer:FindFirstChildOfClass("PlayerGui") }) do
+    if parent then
+        local old = parent:FindFirstChild("UniversalHUB_KeySystem")
+        if old then old:Destroy() end
+    end
+end
+
+---------------------------------------------------------------------
+-- GUI
+---------------------------------------------------------------------
+local ScreenGui = create("ScreenGui", {
+    Name = "UniversalHUB_KeySystem",
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+})
+protectGui(ScreenGui)
+
+local Main = create("Frame", {
+    Name = "Main",
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(0.5, 0, 0.5, 0),
+    Size = UDim2.new(0, 0, 0, 0),
+    BackgroundColor3 = Theme.Background,
+    BorderSizePixel = 0,
+    ClipsDescendants = true,
+    Parent = ScreenGui,
+}, { corner(14), stroke(Theme.Accent, 1.5, 0.5) })
+
+-- Top accent bar
+create("Frame", {
+    Name = "AccentBar",
+    Size = UDim2.new(1, 0, 0, 3),
+    BackgroundColor3 = Theme.Accent,
+    BorderSizePixel = 0,
+    Parent = Main,
+}, {
+    create("UIGradient", {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Theme.Accent),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(70, 170, 255)),
+        }),
+    }),
+})
+
+-- Title
+create("TextLabel", {
+    Name = "Title",
+    Position = UDim2.new(0, 20, 0, 18),
+    Size = UDim2.new(1, -60, 0, 28),
+    BackgroundTransparency = 1,
+    Text = Config.HubName,
+    TextColor3 = Theme.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Font = Enum.Font.GothamBold,
+    TextSize = 22,
+    Parent = Main,
+})
+
+create("TextLabel", {
+    Name = "Subtitle",
+    Position = UDim2.new(0, 20, 0, 46),
+    Size = UDim2.new(1, -40, 0, 18),
+    BackgroundTransparency = 1,
+    Text = "Key System  •  Get your key, then paste it below",
+    TextColor3 = Theme.SubText,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Font = Enum.Font.Gotham,
+    TextSize = 13,
+    Parent = Main,
+})
+
+-- Close button
+local CloseBtn = create("TextButton", {
+    Name = "Close",
+    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -14, 0, 16),
+    Size = UDim2.new(0, 28, 0, 28),
+    BackgroundColor3 = Theme.Surface,
+    Text = "X",
+    TextColor3 = Theme.SubText,
+    Font = Enum.Font.GothamBold,
+    TextSize = 14,
+    AutoButtonColor = false,
+    Parent = Main,
+}, { corner(8) })
+
+-- Key input
+local InputFrame = create("Frame", {
+    Name = "InputFrame",
+    Position = UDim2.new(0, 20, 0, 84),
+    Size = UDim2.new(1, -40, 0, 44),
+    BackgroundColor3 = Theme.Surface,
+    BorderSizePixel = 0,
+    Parent = Main,
+}, { corner(10) })
+local InputStroke = stroke(Theme.Secondary, 1.5)
+InputStroke.Parent = InputFrame
+
+local KeyBox = create("TextBox", {
+    Name = "KeyBox",
+    Position = UDim2.new(0, 14, 0, 0),
+    Size = UDim2.new(1, -28, 1, 0),
+    BackgroundTransparency = 1,
+    Text = "",
+    PlaceholderText = "Enter your key here...",
+    PlaceholderColor3 = Theme.SubText,
+    TextColor3 = Theme.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    ClearTextOnFocus = false,
+    Font = Enum.Font.Gotham,
+    TextSize = 15,
+    Parent = InputFrame,
+})
+
+-- Status label
+local Status = create("TextLabel", {
+    Name = "Status",
+    Position = UDim2.new(0, 20, 0, 134),
+    Size = UDim2.new(1, -40, 0, 18),
+    BackgroundTransparency = 1,
+    Text = "",
+    TextColor3 = Theme.SubText,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Font = Enum.Font.GothamMedium,
+    TextSize = 13,
+    Parent = Main,
+})
+
+-- Buttons (left: Check Key | right: Copy Link)
+local function makeButton(name, text, xScale, xOffset, color)
+    local btn = create("TextButton", {
+        Name = name,
+        Position = UDim2.new(xScale, xOffset, 0, 162),
+        Size = UDim2.new(0.5, -26, 0, 42),
+        BackgroundColor3 = color,
+        Text = text,
+        TextColor3 = Theme.Text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 15,
+        AutoButtonColor = false,
+        Parent = Main,
+    }, { corner(10) })
+
+    local base = color
+    local hover = Color3.new(
+        math.min(base.R + 0.06, 1),
+        math.min(base.G + 0.06, 1),
+        math.min(base.B + 0.06, 1)
+    )
+    btn.MouseEnter:Connect(function() tween(btn, 0.15, { BackgroundColor3 = hover }) end)
+    btn.MouseLeave:Connect(function() tween(btn, 0.15, { BackgroundColor3 = base }) end)
+    return btn
+end
+
+local CheckBtn = makeButton("CheckKey", "Check Key", 0, 20, Theme.Accent)
+local CopyBtn  = makeButton("CopyLink", "Copy Link", 0.5, 6, Theme.Secondary)
+
+---------------------------------------------------------------------
+-- LOGIC
+---------------------------------------------------------------------
+local busy = false
+
+local function setStatus(text, color)
+    Status.Text = text
+    Status.TextColor3 = color or Theme.SubText
+end
+
+local function shake()
+    local origin = Main.Position
+    for _, offset in ipairs({ 8, -8, 5, -5, 0 }) do
+        tween(Main, 0.04, { Position = origin + UDim2.new(0, offset, 0, 0) })
+        task.wait(0.04)
+    end
+end
+
+local function validateKey(key)
+    for _, valid in ipairs(Config.ValidKeys) do
+        if key == valid then
+            return true
+        end
+    end
+
+    if Config.ApiUrl ~= "" then
+        local ok, response = pcall(function()
+            return game:HttpGet(Config.ApiUrl .. key)
+        end)
+        if ok and type(response) == "string" and trim(response):lower() == "true" then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function closeGui()
+    tween(Main, 0.25, { Size = UDim2.new(0, 0, 0, 0) })
+    task.wait(0.3)
+    ScreenGui:Destroy()
+end
+
+CheckBtn.MouseButton1Click:Connect(function()
+    if busy then return end
+    local key = trim(KeyBox.Text)
+
+    if key == "" then
+        setStatus("Please enter a key first.", Theme.Error)
+        tween(InputStroke, 0.2, { Color = Theme.Error })
+        task.spawn(shake)
+        return
+    end
+
+    busy = true
+    CheckBtn.Text = "Checking..."
+    setStatus("Verifying key...", Theme.SubText)
+    tween(InputStroke, 0.2, { Color = Theme.Accent })
+
+    local valid = validateKey(key)
+
+    if valid then
+        CheckBtn.Text = "Success!"
+        setStatus("Key accepted. Loading Universal HUB...", Theme.Success)
+        tween(InputStroke, 0.2, { Color = Theme.Success })
+        task.wait(1)
+        closeGui()
+        task.spawn(Config.OnSuccess)
+    else
+        CheckBtn.Text = "Check Key"
+        setStatus("Invalid key. Please try again.", Theme.Error)
+        tween(InputStroke, 0.2, { Color = Theme.Error })
+        task.spawn(shake)
+        busy = false
+    end
+end)
+
+CopyBtn.MouseButton1Click:Connect(function()
+    if Config.KeyLink == "" or Config.KeyLink == "PASTE_YOUR_KEY_LINK_HERE" then
+        setStatus("No key link has been set yet.", Theme.Error)
+        return
+    end
+
+    local copied = false
+    if setclipboard then
+        copied = pcall(setclipboard, Config.KeyLink)
+    elseif toclipboard then
+        copied = pcall(toclipboard, Config.KeyLink)
+    end
+
+    if copied then
+        CopyBtn.Text = "Copied!"
+        setStatus("Link copied. Open it in your browser to get a key.", Theme.Success)
+        task.delay(1.5, function()
+            if CopyBtn and CopyBtn.Parent then
+                CopyBtn.Text = "Copy Link"
+            end
+        end)
+    else
+        setStatus("Clipboard unsupported. Link: " .. Config.KeyLink, Theme.Error)
+    end
+end)
+
+KeyBox.Focused:Connect(function()
+    tween(InputStroke, 0.2, { Color = Theme.Accent })
+end)
+KeyBox.FocusLost:Connect(function()
+    tween(InputStroke, 0.2, { Color = Theme.Secondary })
+end)
+
+CloseBtn.MouseEnter:Connect(function() tween(CloseBtn, 0.15, { BackgroundColor3 = Theme.Error, TextColor3 = Theme.Text }) end)
+CloseBtn.MouseLeave:Connect(function() tween(CloseBtn, 0.15, { BackgroundColor3 = Theme.Surface, TextColor3 = Theme.SubText }) end)
+CloseBtn.MouseButton1Click:Connect(closeGui)
+
+---------------------------------------------------------------------
+-- DRAGGING (mouse + touch)
+---------------------------------------------------------------------
+do
+    local dragging, dragStart, startPos
+
+    Main.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = Main.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            Main.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+---------------------------------------------------------------------
+-- OPEN ANIMATION
+---------------------------------------------------------------------
+tween(Main, 0.35, { Size = UDim2.new(0, 400, 0, 226) })
